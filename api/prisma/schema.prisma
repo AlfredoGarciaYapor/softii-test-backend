@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TipSession {
+  id            Int           @id @default(autoincrement())
+  totalAmount   Float
+  dividedBy     Int
+  createdAt     DateTime      @default(now())
+  payments      Payment[]
+}
+
+model Payment {
+  id            Int       @id @default(autoincrement())
+  amount        Float
+  method        PaymentMethod
+  createdAt     DateTime  @default(now())
+  tipSessionId  Int
+  tipSession    TipSession @relation(fields: [tipSessionId], references: [id])
+}
+
+enum PaymentMethod {
+  CASH
+  CARD_SANTANDER
+  CARD_BBVA
+  OTHER
+}
