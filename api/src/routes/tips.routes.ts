@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import {
-  createShift,
-  registerPayment,
-  getTipSession,
+import { 
+  addTip, 
+  listTips, 
+  checkTipStatus 
 } from '../controllers/tips.controller';
 
 const router = Router();
 
-router.post('/tips', createShift);
-router.post('/tips/:id/payments', registerPayment);
-router.get('/tips/:id', getTipSession);
+router.post('/:shiftId', addTip);
+router.get('/:shiftId', listTips);
+router.get('/:tipId/status', checkTipStatus);
 
 export default router;

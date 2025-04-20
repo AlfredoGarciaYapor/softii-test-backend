@@ -1,54 +1,51 @@
-import prisma from '../database/db';
-import { PaymentMethod } from '@prisma/client';
+import { model } from 'mongoose';
+import Tip from '../models/tip.model';
+import Shift from '../models/shift.model';
+import { ITip } from '../types';
 
-const createShift = async (totalAmount: number, dividedBy: number) => {
-  return await prisma.tipSession.create({
-    data: {
-      totalAmount,
-      dividedBy,
-    },
-  });
-};
-
-const registerPayment = async (
-  tipSessionId: number,
-  amount: number,
-  method: PaymentMethod
-) => {
-  return await prisma.payment.create({
-    data: {
-      amount,
-      method,
-      tipSessionId,
-    },
-  });
-};
-
-const getTipSession = async (id: number) => {
-  const session = await prisma.tipSession.findUnique({
-    where: { id },
-    include: { payments: true },
+export const createTip = async (amount: number, splitCount: number, shiftId: string): Promise<ITip> => {
+  
+  // Crear la propina
+  const tip = new Tip({
+    amount,
+    splitCount,
+    shift: shiftId
   });
 
-  if (!session) throw new Error('Tip session not found');
+  // Guardar la propina
+  const savedTip = await tip.save();
+  
+  // Actualizar el turno con la referencia a la nueva propina
+  await Shift.findByIdAndUpdate(
+    shiftId,
+    { 
+      $push: { tips: savedTip._id },
+      $inc: { totalTips: amount }
+    }
+  ).exec();
 
-  const totalPaid = session.payments.reduce((acc, p) => acc + p.amount, 0);
-  const remaining = session.totalAmount - totalPaid;
-  const perPerson = session.dividedBy > 0 ? session.totalAmount / session.dividedBy : 0;
-
-  return {
-    id: session.id,
-    totalAmount: session.totalAmount,
-    dividedBy: session.dividedBy,
-    perPerson: perPerson.toFixed(2),
-    totalPaid,
-    remaining,
-    payments: session.payments,
-  };
+  return savedTip;
 };
 
-export default {
-  createShift,
-  registerPayment,
-  getTipSession,
+export const getTipsByShift = async (shiftId: string): Promise<ITip[]> => {
+  return await Tip.find({ shift: shiftId }).exec();
+};
+
+export const markTipAsPaid = async (tipId: string): Promise<ITip | null> => {
+  return await Tip.findByIdAndUpdate(
+    tipId,
+    { isPaid: true },
+    { new: true }
+  ).exec();
+};
+
+export const calculateRemainingAmount = async (tipId: string): Promise<number> => {
+  const tip = await Tip.findById(tipId).exec();
+  if (!tip) return 0;
+  
+  const Payment = model('Payment');
+  const payments = await Payment.find({ tip: tipId });
+  const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+  
+  return tip.amount - paidAmount;
 };
